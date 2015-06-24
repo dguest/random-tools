@@ -1,0 +1,75 @@
+#!/usr/bin/env bash 
+echo  \\documentclass{beamer}
+echo  \\useoutertheme{infolines}
+echo  
+echo  "\title{Update}" 
+echo  "\author[${USER}]{Dan Guest}"
+echo  "\institute[UCI]{UC Irvine}"
+echo
+
+cat <<EOF
+
+\usecolortheme{beaver}
+\setbeamercolor{item projected}{bg=darkred}
+\setbeamertemplate{enumerate items}[default]
+\setbeamertemplate{navigation symbols}{}
+\setbeamercovered{transparent}
+\setbeamercolor{block title}{fg=darkred}
+\setbeamercolor{local structure}{fg=darkred}
+\usefonttheme{serif} % default family is serif
+
+\newcommand{\pt}{p_{\mathrm{T}}}
+\newcommand{\met}{E_{\mathrm{T}}^{\mathrm{miss}}}
+\newcommand{\graphic}[2][0.99]{\includegraphics[width=#1\textwidth]{#2}}
+
+\newcommand{\backupbegin}{
+   \newcounter{framenumberappendix}
+   \setcounter{framenumberappendix}{\value{framenumber}}
+}
+\newcommand{\backupend}{
+   \addtocounter{framenumberappendix}{-\value{framenumber}}
+   \addtocounter{framenumber}{\value{framenumberappendix}} 
+}
+
+\newcommand{\link}[2]{\underline{\href{#2}{#1}}}
+EOF
+
+echo  \\begin{document}
+echo  
+
+inputs=( $@ )
+
+function _namify() { 
+    local b=$(basename ${1%.pdf})
+    local t=$(sed -r -e 's/_/ /g' -e 's/([0-9]) ([0-9])/\1--\2/g' <<< $b)
+    echo $t
+}
+
+for (( iplt=0 ; iplt < ${#inputs[*]} ; iplt+=2))
+do 
+    plt1=${inputs[$iplt]}
+    plt2=${inputs[$iplt+1]}
+    p1_name=$(_namify $plt1)
+    p2_name=$(_namify $plt2)
+    cat <<EOF
+\begin{frame}
+  \begin{columns}
+    \begin{column}{0.5\textwidth}
+      \begin{center}
+        $p1_name
+        \includegraphics[width=\textwidth]{$plt1}
+      \end{center}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \begin{center}
+        $p2_name
+        \includegraphics[width=\textwidth]{$plt2}
+      \end{center}
+    \end{column}
+   \end{columns}
+\end{frame}
+EOF
+done
+
+echo \\end{document}
+
