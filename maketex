@@ -9,13 +9,19 @@ echo
 
 cat <<EOF
 
-\usecolortheme{beaver}
-\setbeamercolor{item projected}{bg=darkred}
+\definecolor{UCIBlue}{RGB}{0,100,164}
+\definecolor{UCIYellow}{RGB}{255,210,0}
+\definecolor{UCIYDull}{RGB}{247,235,95}
+\definecolor{UCIBDull}{RGB}{106,162,184}
+\definecolor{UCIBDark}{RGB}{27,61,109}
+
+\usecolortheme{crane}
+\setbeamercolor*{palette primary}{use=structure,fg=white,bg=UCIBlue}
+\setbeamercolor*{palette secondary}{use=structure,fg=white,bg=UCIYellow}
+\setbeamercolor*{palette tertiary}{use=structure,fg=white,bg=UCIBDark}
 \setbeamertemplate{enumerate items}[default]
 \setbeamertemplate{navigation symbols}{}
 \setbeamercovered{transparent}
-\setbeamercolor{block title}{fg=darkred}
-\setbeamercolor{local structure}{fg=darkred}
 \usefonttheme{serif} % default family is serif
 
 \newcommand{\pt}{p_{\mathrm{T}}}
