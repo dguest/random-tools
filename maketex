@@ -1,49 +1,88 @@
-#!/usr/bin/env bash 
-echo  \\documentclass{beamer}
-echo  \\useoutertheme{infolines}
-echo  
-echo  "\title{Update}" 
-echo  "\author[${USER}]{Dan Guest}"
-echo  "\institute[UCI]{UC Irvine}"
-echo
+#!/usr/bin/env bash
 
-cat <<EOF
+_make_talk() {
+    # top level functions to dump info
+    _basic_header "Update" "Dan Guest" "UC Irvine" "UCI"
+    _uci_colors
+    echo
+    _misc_style
+    _basic_physics_symbols
+    _susy_symbols
+    echo
+    _larger_macros
+    echo
+    echo "\begin{document}"
+    echo
+    echo "\end{document}"
+}
 
+_basic_header() {
+    local TITLE=${1}
+    local LONG_NAME=${2-"Dan Guest"}
+    local LONG_INST=${3-"UC Irvine"}
+    local INST=${4-"UCI"}
+    cat <<EOF
+\documentclass{beamer}
+\useoutertheme{infolines}
+\title{$TITLE}
+\author[${USER}]{$LONG_NAME}
+\institute[${INST}]{${LONG_INST}}
+EOF
+}
+_uci_colors() {
+    cat <<EOF
 \definecolor{UCIBlue}{RGB}{0,100,164}
 \definecolor{UCIYellow}{RGB}{255,210,0}
 \definecolor{UCIYDull}{RGB}{247,235,95}
 \definecolor{UCIBDull}{RGB}{106,162,184}
 \definecolor{UCIBDark}{RGB}{27,61,109}
-
 \usecolortheme{crane}
 \setbeamercolor*{palette primary}{use=structure,fg=white,bg=UCIBlue}
 \setbeamercolor*{palette secondary}{use=structure,fg=white,bg=UCIYellow}
 \setbeamercolor*{palette tertiary}{use=structure,fg=white,bg=UCIBDark}
+EOF
+}
+_misc_style() {
+    cat <<EOF
 \setbeamertemplate{enumerate items}[default]
 \setbeamertemplate{navigation symbols}{}
 \setbeamercovered{transparent}
 \usefonttheme{serif} % default family is serif
+EOF
+}
 
+_basic_physics_symbols() {
+    cat <<EOF
+\newcommand{\T}{\mathrm{T}}
 \newcommand{\pt}{p_{\mathrm{T}}}
 \newcommand{\met}{E_{\mathrm{T}}^{\mathrm{miss}}}
-\newcommand{\graphic}[2][0.99]{\includegraphics[width=#1\textwidth]{#2}}
+EOF
+}
 
+_susy_symbols() {
+    cat <<EOF
+\newcommand{\supp}[1]{\tilde{#1}}
+\newcommand{\neut}{\supp{\chi}_1^0}
+\newcommand{\cha}{\supp{\chi}_{1}^{\pm}}
+EOF
+}
+
+_larger_macros() {
+    cat <<EOF
+\newcommand{\graphic}[2][0.99]{\includegraphics[width=#1\textwidth]{#2}}
 \newcommand{\backupbegin}{
    \newcounter{framenumberappendix}
    \setcounter{framenumberappendix}{\value{framenumber}}
 }
 \newcommand{\backupend}{
    \addtocounter{framenumberappendix}{-\value{framenumber}}
-   \addtocounter{framenumber}{\value{framenumberappendix}} 
+   \addtocounter{framenumber}{\value{framenumberappendix}}
 }
-
 \newcommand{\link}[2]{\underline{\href{#2}{#1}}}
 EOF
+}
 
-echo  \\begin{document}
-echo  
 
-inputs=( $@ )
 
 function _namify() { 
     local b=$(basename ${1%.pdf})
@@ -51,13 +90,15 @@ function _namify() {
     echo $t
 }
 
-for (( iplt=0 ; iplt < ${#inputs[*]} ; iplt+=2))
-do 
-    plt1=${inputs[$iplt]}
-    plt2=${inputs[$iplt+1]}
-    p1_name=$(_namify $plt1)
-    p2_name=$(_namify $plt2)
-    cat <<EOF
+_graphic_slides() {
+    inputs=( $@ )
+    for (( iplt=0 ; iplt < ${#inputs[*]} ; iplt+=2))
+    do
+	plt1=${inputs[$iplt]}
+	plt2=${inputs[$iplt+1]}
+	p1_name=$(_namify $plt1)
+	p2_name=$(_namify $plt2)
+	cat <<EOF
 \begin{frame}
   \begin{columns}
     \begin{column}{0.5\textwidth}
@@ -75,7 +116,8 @@ do
    \end{columns}
 \end{frame}
 EOF
-done
+    done
+}
 
-echo \\end{document}
+_make_talk $@
 
