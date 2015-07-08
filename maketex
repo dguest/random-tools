@@ -1,5 +1,53 @@
 #!/usr/bin/env bash
 
+_usage() {
+    echo "${0##*/} [-h] [-m <talk name>]"
+}
+_help() {
+    _usage
+    cat <<EOF
+Make a talk template in Beamer.
+
+Options:
+ -h: get help
+ -m: build makefile for <talk name>
+
+EOF
+}
+
+# __________________________________________________________________
+# top level run script
+
+_run() {
+    local opt
+    local MAKE_TARGET=''
+    while getopts "hm:" opt $@; do
+	case $opt in
+	    h) _help; return 1;;
+	    m) MAKE_TARGET=${OPTARG} ;;
+	esac
+    done
+    if [[ ${VARNAME-} == ? ]] ; then
+	echo "error, exiting..." >&2
+	return 1
+    fi
+    shift $(($OPTIND - 1))
+    if [[ $@ ]] ; then
+	_usage
+	echo "error: should get no args, got $@..." >&2
+	return 1
+    fi
+    if [[ $MAKE_TARGET ]] ; then
+	if [[ ! $MAKE_TARGET == *.tex ]] ; then
+	    echo "target should be a .tex file, quitting..." >&2
+	    return 1
+	fi
+	_makefile $MAKE_TARGET
+	return 0
+    fi
+    _make_talk
+}
+
 _make_talk() {
     # top level functions to dump info
     _basic_header "Update" "Dan Guest" "UC Irvine" "UCI"
@@ -11,6 +59,7 @@ _make_talk() {
     echo
     _larger_macros
     echo
+    echo "\graphicspath{{figures/}}"
     echo "\begin{document}"
     echo
     echo "\end{document}"
@@ -79,45 +128,48 @@ _larger_macros() {
    \addtocounter{framenumber}{\value{framenumberappendix}}
 }
 \newcommand{\link}[2]{\underline{\href{#2}{#1}}}
-EOF
-}
-
-
-
-function _namify() {
-    local b=$(basename ${1%.pdf})
-    local t=$(sed -r -e 's/_/ /g' -e 's/([0-9]) ([0-9])/\1--\2/g' <<< $b)
-    echo $t
-}
-
-_graphic_slides() {
-    inputs=( $@ )
-    for (( iplt=0 ; iplt < ${#inputs[*]} ; iplt+=2))
-    do
-	plt1=${inputs[$iplt]}
-	plt2=${inputs[$iplt+1]}
-	p1_name=$(_namify $plt1)
-	p2_name=$(_namify $plt2)
-	cat <<EOF
-\begin{frame}
+\newcommand{\twocol}[3][0.5]{
+  \newdimen\scwid
+  \scwid=\dimexpr\textwidth-#1\textwidth\relax
   \begin{columns}
-    \begin{column}{0.5\textwidth}
-      \begin{center}
-        $p1_name
-        \includegraphics[width=\textwidth]{$plt1}
-      \end{center}
-    \end{column}
-    \begin{column}{0.5\textwidth}
-      \begin{center}
-        $p2_name
-        \includegraphics[width=\textwidth]{$plt2}
-      \end{center}
-    \end{column}
-   \end{columns}
-\end{frame}
+    \begin{column}{#1\textwidth}#2\end{column}
+      \begin{column}{\scwid}#3\end{column}
+  \end{columns}
+}
+\newcommand{\cent}[1]{\begin{center}#1\end{center}}
 EOF
-    done
 }
 
-_make_talk $@
+# __________________________________________________________________
+# to make a makefile
 
+_makefile() {
+    local TALK_NAME=$1
+    cat <<EOF >| makefile
+BIBTEX   = bibtex
+PDFTEX = pdflatex -interaction=nonstopmode -halt-on-error -shell-escape
+
+.PHONY: all
+
+ALLSRC := ${TALK_NAME}
+all: \$(ALLSRC:.tex=.pdf)
+	@rm -f TMP-*
+
+TEXFILES := \$(shell find -L . -maxdepth 2 -name '*.tex')
+FIGURES := \$(shell find -L figures/ -name '*.pdf')
+
+%.bbl: %.tex \$(TEXFILES) *.bib
+	\$(PDFTEX) $* --draftmode
+	\$(BIBTEX) $*
+
+IGNORE_WARNINGS := 'Marginpar on page|float specifier changed'
+COLOR_WARNINGS := '^LaTeX Warning:|Fatal error'
+FILTER_WARN := egrep -v \$(IGNORE_WARNINGS) | egrep --color \$(COLOR_WARNINGS)
+%.pdf: %.tex \$(TEXFILES) \$(FIGURES)
+	\$(PDFTEX) $< --draftmode
+	\$(PDFTEX) $<
+EOF
+}
+
+
+_run $@
