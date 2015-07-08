@@ -92,12 +92,12 @@ _run() {
     fi
     _add_compile_rule >> $MAKEFILE
     _add_dep_gen >> $MAKEFILE
-    _make_obj_dummy testobj
+    _make_obj_dummy tools
     if [ $PYTHON_LIB ] ; then
-	_make_py_dummy $PYTHON_LIB testobj
+	_make_py_dummy $PYTHON_LIB tools
     fi
     if [ $PREFIX ] ; then
-	_make_src_dummy ${PREFIX}main testobj
+	_make_src_dummy ${PREFIX}main tools
     fi
 }
 
@@ -352,9 +352,10 @@ int testfunc(int in) {
 }
 EOF
 
+    local GUARD=$(tr '[:lower:]-' '[:upper:]_' <<< $OBJ_NAME)_HH
     cat <<EOF >| include/${OBJ_NAME}.hh
-#ifndef ${OBJ_NAME}
-#define ${OBJ_NAME}
+#ifndef ${GUARD}
+#define ${GUARD}
 int testfunc(int in = 0);
 #endif
 EOF
