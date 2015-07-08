@@ -325,8 +325,11 @@ _make_src_dummy() {
     cat <<EOF >| src/${EXE_NAME}.cxx
 #include "${TEST_OBJ}.hh"
 #include <cstdio>
+#include <cstdlib>
 int main(int argc, char* argv[]) {
-  int testint = testfunc();
+  int in = 0;
+  if (argc > 1) in = atoi(argv[1]);
+  int testint = testfunc(in);
   printf("bonjour et %i\n", testint);
   return 0;
 }
@@ -340,7 +343,11 @@ _make_obj_dummy() {
 
     cat <<EOF >| src/${OBJ_NAME}.cxx
 #include "${OBJ_NAME}.hh"
+#include <stdexcept>
 int testfunc(int in) {
+  if (in == 42) {
+    throw std::runtime_error("You a nerd");
+  }
   return in + 1;
 }
 EOF
@@ -361,15 +368,23 @@ _make_py_dummy() {
 #include <Python.h>
 #include "${TEST_OBJ}.hh"
 
+#include <stdexcept>
+
 static PyObject* py_alg(PyObject *self, PyObject *args)
 {
   const char* echo_this;
   int some_int = 0;
   bool ok = PyArg_ParseTuple(args,"s|i:alg", &echo_this, &some_int);
   if (!ok) return NULL;
-  int newret = testfunc(some_int);
-  printf("hi %s %i\n", echo_this, newret);
-  return Py_BuildValue("i", newret);
+  try {
+    int newret = testfunc(some_int);
+    printf("hi %s %i\n", echo_this, newret);
+    return Py_BuildValue("i", newret);
+  }
+  catch (const std::exception& e) {
+    PyErr_SetString(PyExc_IOError, e.what());
+    return NULL;
+  }
 }
 
 
