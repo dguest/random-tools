@@ -84,7 +84,7 @@ EOF
 
 
 
-function _namify() { 
+function _namify() {
     local b=$(basename ${1%.pdf})
     local t=$(sed -r -e 's/_/ /g' -e 's/([0-9]) ([0-9])/\1--\2/g' <<< $b)
     echo $t
