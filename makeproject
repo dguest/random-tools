@@ -47,8 +47,13 @@ _run() {
 	return 1
     fi
     local MAKEFILE=makefile
+    local PREFIX=test- 		# todo: make this an opt
+    if [ $ADD_PYTHON ] ; then
+	# hack to keep the default build rule away from python
+	local PREFIX=_
+    fi
     _head_comment >| $MAKEFILE
-    _make_base >> $MAKEFILE
+    _make_base $PREFIX >> $MAKEFILE
     if [ $ADD_HDF ] ; then
 	_add_hdf >> $MAKEFILE
     fi
@@ -60,16 +65,17 @@ _run() {
 	_add_root >> $MAKEFILE
     fi
     if [ $ADD_PYTHON ] ; then
-	_add_python_rules _hi >> $MAKEFILE
+	_add_python_rules _test >> $MAKEFILE
     else
-	_add_general_buildsec main >> $MAKEFILE
+	_add_general_buildsec >> $MAKEFILE
     fi
     _add_compile_rule >> $MAKEFILE
     _add_dep_gen >> $MAKEFILE
+    _make_obj_dummy testobj
     if [ $ADD_PYTHON ] ; then
-	_make_py_dummy _hi
+	_make_py_dummy _test testobj
     else
-	_make_src_dummy main
+	_make_src_dummy ${PREFIX}main testobj
     fi
 }
 
@@ -81,6 +87,7 @@ EOF
 }
 
 _make_base() {
+    local PREFIX=$1
     cat <<EOF
 
 # --- set dirs
@@ -89,6 +96,7 @@ SRC          := src
 INC          := include
 DICT         := dict
 OUTPUT       := bin
+EXE_PREFIX   := ${PREFIX}
 
 #  set search path
 vpath %.cxx  \$(SRC)
@@ -102,7 +110,9 @@ CXX          ?= g++
 CXXFLAGS     := -O2 -Wall -fPIC -I\$(INC) -g -std=c++11
 
 # ---- define objects
-GEN_OBJ     := # DEFINE GENERAL OBJECTS HERE
+ALL_OBJ_SRC   := \$(wildcard \$(SRC)/*.cxx)
+ALL_OBJ       := \$(notdir \$(ALL_OBJ_SRC:%.cxx=%.o))
+GEN_OBJ       := \$(filter-out \$(EXE_PREFIX),\$(ALL_OBJ))
 GEN_OBJ_PATHS := \$(GEN_OBJ:%=\$(BUILD)/%)
 
 EOF
@@ -164,17 +174,17 @@ EOF
 }
 
 _add_general_buildsec() {
-    local BASE_ROUTINE=$1
     cat <<EOF
 # stuff used for the c++ executable
-ALL_EXE       := ${BASE_ROUTINE}
+ALL_EXE_SRC   := \$(wildcard \$(SRC)/\$(EXE_PREFIX)*.cxx)
+ALL_EXE       := \$(notdir \$(ALL_EXE_SRC:%.cxx=%))
 ALL_EXE_PATHS := \$(ALL_EXE:%=\$(OUTPUT)/%)
 
 # --- all routine
 all: \$(ALL_EXE_PATHS)
 
 # --- build top level
-\$(OUTPUT)/${BASE_ROUTINE}: \$(GEN_OBJ_PATHS) \$(BUILD)/${BASE_ROUTINE}.o
+\$(OUTPUT)/\$(EXE_PREFIX)%: \$(GEN_OBJ_PATHS) \$(BUILD)/\$(EXE_PREFIX)%.o
 	@mkdir -p \$(OUTPUT)
 	@echo "linking $^ --> \$@"
 	@\$(CXX) -o \$@ $^ \$(LIBS) \$(LDFLAGS)
@@ -188,7 +198,7 @@ _add_python_rules() {
 # --- python top level objects
 PY_OBJ       := ${BASE_ROUTINE}.o
 PY_OBJ_PATHS := \$(PY_OBJ:%=\$(BUILD)/%)
-PY_SO        := ${BASE_ROUTINE}.so
+PY_SO        := \$(OUTPUT)/${BASE_ROUTINE}.so
 
 # --- all routine
 all: \$(PY_SO)
@@ -252,29 +262,55 @@ EOF
 _make_src_dummy() {
     mkdir -p src/
     local EXE_NAME=$1
+    local TEST_OBJ=${2-testobj}
     cat <<EOF >| src/${EXE_NAME}.cxx
+#include "${TEST_OBJ}.hh"
 #include <cstdio>
 int main(int argc, char* argv[]) {
-  printf("bonjour\n");
+  int testint = testfunc();
+  printf("bonjour et %i\n", testint);
   return 0;
 }
+EOF
+}
+
+_make_obj_dummy() {
+    mkdir -p src/
+    mkdir -p include/
+    local OBJ_NAME=$1
+
+    cat <<EOF >| src/${OBJ_NAME}.cxx
+#include "${OBJ_NAME}.hh"
+int testfunc(int in) {
+  return in + 1;
+}
+EOF
+
+    cat <<EOF >| include/${OBJ_NAME}.hh
+#ifndef ${OBJ_NAME}
+#define ${OBJ_NAME}
+int testfunc(int in = 0);
+#endif
 EOF
 }
 
 _make_py_dummy() {
     mkdir -p src/
     local MODNAME=$1
+    local TEST_OBJ=${2-testobj}
     cat <<EOF >| src/${MODNAME}.cxx
 #include <Python.h>
+#include "${TEST_OBJ}.hh"
 
 static PyObject* py_alg(PyObject *self, PyObject *args)
 {
   const char* echo_this;
-  int return_this = 1;
-  bool ok = PyArg_ParseTuple(args,"s|i:alg", &echo_this, &return_this);
+  int some_int = 0;
+  bool ok = PyArg_ParseTuple(args,"s|i:alg", &echo_this, &some_int);
   if (!ok) return NULL;
-  printf("hi %s %i\n", echo_this, return_this);
-  return Py_BuildValue("i", return_this);
+  int newret = testfunc(some_int);
+  printf("hi %s %i\n", echo_this, newret);
+  return Py_BuildValue("i", newret);
 }
 
 
