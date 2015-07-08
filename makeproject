@@ -5,10 +5,13 @@ set -eu
 _usage() {
     echo "${0##*/} [-hrdp] "
 }
+DEFAULT_PREFIX=run-
 _help() {
     _usage
     cat <<EOF
-Make a project template.
+Make a project template. If no prefix is given use "$DEFAULT_PREFIX".
+If no prefix is given but a python library name is given, only make
+a python library.
 WARNING: use in an empty directory
 
 Options:
@@ -39,9 +42,15 @@ _run() {
 	    e) PREFIX=${OPTARG} ;;
 	esac
     done
+
+    # various checks
     if [[ ${VARNAME-} == ? ]] ; then
 	echo "error, exiting..." >&2
 	return 1
+    fi
+    if [[ ! $PREFIX && ! $PYTHON_LIB ]] ; then
+	PREFIX=$DEFAULT_PREFIX
+	echo "WARNING: setting default prefix to '$PREFIX'"
     fi
     shift $(($OPTIND - 1))
     if [[ $@ ]] ; then
@@ -49,6 +58,12 @@ _run() {
 	echo "error: should get no args, got $@..." >&2
 	return 1
     fi
+    if _files_exist ; then
+	echo "found files in current dir, exiting..." >&2
+	return 1
+    fi
+
+    # actually build the project starting here
     local MAKEFILE=makefile
     _head_comment >| $MAKEFILE
     _make_base >> $MAKEFILE
@@ -83,6 +98,15 @@ _run() {
     fi
     if [ $PREFIX ] ; then
 	_make_src_dummy ${PREFIX}main testobj
+    fi
+}
+
+_files_exist () {
+    files=$(shopt -s nullglob dotglob; echo *)
+    if (( ${#files} )) ; then
+       return 0
+    else
+	return 1
     fi
 }
 
