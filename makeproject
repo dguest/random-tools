@@ -213,7 +213,7 @@ all: \$(PY_SO)
 \$(PY_SO): \$(GEN_OBJ_PATHS) \$(BUILD)/${BASE_ROUTINE}.o
 	@mkdir -p \$(OUTPUT)
 	@echo "linking $^ --> \$@"
-	@\$(CXX) -o \$@ $^ \$(GEN_OBJ_PATHS) \$(LIBS) \$(PY_LDFLAGS)
+	@\$(CXX) -o \$@ $^ \$(LIBS) \$(PY_LDFLAGS)
 
 EOF
 }
