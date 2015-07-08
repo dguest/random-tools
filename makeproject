@@ -29,7 +29,7 @@ _run() {
     local ADD_ROOT=''
     local ADD_HDF=''
     local PYTHON_LIB=''
-    local PREFIX=test-
+    local PREFIX=''
     while getopts "hrdp:e:" opt $@; do
 	case $opt in
 	    h) _help; return 1;;
@@ -51,7 +51,7 @@ _run() {
     fi
     local MAKEFILE=makefile
     _head_comment >| $MAKEFILE
-    _make_base $PREFIX >> $MAKEFILE
+    _make_base >> $MAKEFILE
     if [ $ADD_HDF ] ; then
 	_add_hdf >> $MAKEFILE
     fi
@@ -64,13 +64,15 @@ _run() {
     fi
     if [ $PYTHON_LIB ] ; then
 	_add_python_objects $PYTHON_LIB >> $MAKEFILE
-    else
-	_add_exe_objects >> $MAKEFILE
+    fi
+    if [ $PREFIX ] ; then
+	_add_exe_objects $PREFIX >> $MAKEFILE
     fi
     _add_all_call >> $MAKEFILE
     if [ $PYTHON_LIB ] ; then
 	_add_python_build $PYTHON_LIB >> $MAKEFILE
-    else
+    fi
+    if [ $PREFIX ] ; then
 	_add_exe_build >> $MAKEFILE
     fi
     _add_compile_rule >> $MAKEFILE
@@ -78,7 +80,8 @@ _run() {
     _make_obj_dummy testobj
     if [ $PYTHON_LIB ] ; then
 	_make_py_dummy $PYTHON_LIB testobj
-    else
+    fi
+    if [ $PREFIX ] ; then
 	_make_src_dummy ${PREFIX}main testobj
     fi
 }
@@ -91,7 +94,6 @@ EOF
 }
 
 _make_base() {
-    local PREFIX=$1
     cat <<EOF
 
 # --- set dirs
@@ -101,8 +103,6 @@ INC          := include
 DICT         := dict
 OUTPUT       := bin
 LIB          := lib
-# prefix for executables
-EXE_PREFIX   := ${PREFIX}
 
 #  set search path
 vpath %.cxx  \$(SRC)
@@ -116,10 +116,12 @@ CXX          ?= g++
 CXXFLAGS     := -O2 -Wall -fPIC -I\$(INC) -g -std=c++11
 
 # ---- define objects
-ALL_OBJ_SRC   := \$(wildcard \$(SRC)/*.cxx)
-ALL_OBJ       := \$(notdir \$(ALL_OBJ_SRC:%.cxx=%.o))
-GEN_OBJ       := \$(filter-out \$(EXE_PREFIX),\$(ALL_OBJ))
+GEN_OBJ_SRC   := \$(wildcard \$(SRC)/*.cxx)
+GEN_OBJ       := \$(notdir \$(GEN_OBJ_SRC:%.cxx=%.o))
 GEN_OBJ_PATHS := \$(GEN_OBJ:%=\$(BUILD)/%)
+
+# --- all top level (added further down)
+ALL_TOP_LEVEL :=
 
 EOF
 }
@@ -188,20 +190,26 @@ EOF
 }
 
 _add_exe_objects() {
+    local PREFIX=$1
     cat <<EOF
-# stuff used for the c++ executable
+# --- stuff used for the c++ executable
+EXE_PREFIX   := ${PREFIX}
+
 ALL_EXE_SRC   := \$(wildcard \$(SRC)/\$(EXE_PREFIX)*.cxx)
 ALL_EXE       := \$(notdir \$(ALL_EXE_SRC:%.cxx=%))
 ALL_EXE_PATHS := \$(ALL_EXE:%=\$(OUTPUT)/%)
 
-# --- all routine
+# filter out the general objects
+GEN_OBJ_PATHS := \$(filter-out \$(BUILD)/\$(EXE_PREFIX)%.o,\$(GEN_OBJ_PATHS))
+
+# add to all top level
 ALL_TOP_LEVEL += \$(ALL_EXE_PATHS)
 
 EOF
 }
 _add_exe_build() {
     cat <<EOF
-# --- build top level
+# build exe
 \$(OUTPUT)/\$(EXE_PREFIX)%: \$(GEN_OBJ_PATHS) \$(BUILD)/\$(EXE_PREFIX)%.o
 	@mkdir -p \$(OUTPUT)
 	@echo "linking $^ --> \$@"
@@ -222,7 +230,7 @@ PY_SO        := \$(LIB)/${PYLIB}.so
 # filter out the general objects
 GEN_OBJ_PATHS := \$(filter-out \$(BUILD)/${PYLIB}.o,\$(GEN_OBJ_PATHS))
 
-# --- all routine
+# add to all top level
 ALL_TOP_LEVEL += \$(PY_SO)
 
 EOF
