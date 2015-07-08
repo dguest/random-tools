@@ -15,7 +15,8 @@ Options:
  -h: get help
  -r: use ROOT
  -d: use HDF5
- -p: use python
+ -p <lib name>: make python lib
+ -e <exe prefix>: prefix for executables
 
 EOF
 }
@@ -27,13 +28,15 @@ _run() {
     local opt
     local ADD_ROOT=''
     local ADD_HDF=''
-    local ADD_PYTHON=''
-    while getopts "hrdp" opt $@; do
+    local PYTHON_LIB=''
+    local PREFIX=test-
+    while getopts "hrdp:e:" opt $@; do
 	case $opt in
 	    h) _help; return 1;;
 	    r) ADD_ROOT=1 ;;
 	    d) ADD_HDF=1 ;;
-	    p) ADD_PYTHON=1 ;;
+	    p) PYTHON_LIB=${OPTARG} ;;
+	    e) PREFIX=${OPTARG} ;;
 	esac
     done
     if [[ ${VARNAME-} == ? ]] ; then
@@ -47,33 +50,34 @@ _run() {
 	return 1
     fi
     local MAKEFILE=makefile
-    local PREFIX=test- 		# todo: make this an opt
-    if [ $ADD_PYTHON ] ; then
-	# hack to keep the default build rule away from python
-	local PREFIX=_
-    fi
     _head_comment >| $MAKEFILE
     _make_base $PREFIX >> $MAKEFILE
     if [ $ADD_HDF ] ; then
 	_add_hdf >> $MAKEFILE
     fi
     # _add_ndhist >> $MAKEFILE
-    if [ $ADD_PYTHON ] ; then
-       _add_python >> $MAKEFILE
+    if [ $PYTHON_LIB ] ; then
+       _add_python_config >> $MAKEFILE
     fi
     if [ $ADD_ROOT ] ; then
 	_add_root >> $MAKEFILE
     fi
-    if [ $ADD_PYTHON ] ; then
-	_add_python_rules _test >> $MAKEFILE
+    if [ $PYTHON_LIB ] ; then
+	_add_python_objects $PYTHON_LIB >> $MAKEFILE
     else
-	_add_general_buildsec >> $MAKEFILE
+	_add_exe_objects >> $MAKEFILE
+    fi
+    _add_all_call >> $MAKEFILE
+    if [ $PYTHON_LIB ] ; then
+	_add_python_build $PYTHON_LIB >> $MAKEFILE
+    else
+	_add_exe_build >> $MAKEFILE
     fi
     _add_compile_rule >> $MAKEFILE
     _add_dep_gen >> $MAKEFILE
     _make_obj_dummy testobj
-    if [ $ADD_PYTHON ] ; then
-	_make_py_dummy _test testobj
+    if [ $PYTHON_LIB ] ; then
+	_make_py_dummy $PYTHON_LIB testobj
     else
 	_make_src_dummy ${PREFIX}main testobj
     fi
@@ -96,6 +100,8 @@ SRC          := src
 INC          := include
 DICT         := dict
 OUTPUT       := bin
+LIB          := lib
+# prefix for executables
 EXE_PREFIX   := ${PREFIX}
 
 #  set search path
@@ -136,13 +142,13 @@ EOF
 
 _add_ndhist() {
     cat <<EOF
-LIBS         := \$(shell ndhist-config --libs)
+LIBS         += \$(shell ndhist-config --libs)
 CXXFLAGS     += \$(shell ndhist-config --cflags)
 
 EOF
 }
 
-_add_python() {
+_add_python_config() {
     cat <<EOF
 # --- python config
 PY_CONFIG := python3-config
@@ -173,7 +179,15 @@ LIBS         += \$(ROOTLIBS)
 EOF
 }
 
-_add_general_buildsec() {
+_add_all_call() {
+    cat <<EOF
+# --- first call here
+all: \$(ALL_TOP_LEVEL)
+
+EOF
+}
+
+_add_exe_objects() {
     cat <<EOF
 # stuff used for the c++ executable
 ALL_EXE_SRC   := \$(wildcard \$(SRC)/\$(EXE_PREFIX)*.cxx)
@@ -181,8 +195,12 @@ ALL_EXE       := \$(notdir \$(ALL_EXE_SRC:%.cxx=%))
 ALL_EXE_PATHS := \$(ALL_EXE:%=\$(OUTPUT)/%)
 
 # --- all routine
-all: \$(ALL_EXE_PATHS)
+ALL_TOP_LEVEL += \$(ALL_EXE_PATHS)
 
+EOF
+}
+_add_exe_build() {
+    cat <<EOF
 # --- build top level
 \$(OUTPUT)/\$(EXE_PREFIX)%: \$(GEN_OBJ_PATHS) \$(BUILD)/\$(EXE_PREFIX)%.o
 	@mkdir -p \$(OUTPUT)
@@ -192,26 +210,35 @@ all: \$(ALL_EXE_PATHS)
 EOF
 }
 
-_add_python_rules() {
-    local BASE_ROUTINE=$1
+_add_python_objects() {
+    PYLIB=$1
     cat <<EOF
 # --- python top level objects
-PY_OBJ       := ${BASE_ROUTINE}.o
-PY_OBJ_PATHS := \$(PY_OBJ:%=\$(BUILD)/%)
-PY_SO        := \$(OUTPUT)/${BASE_ROUTINE}.so
+PY_OBJ       := ${PYLIB}.o
+PY_OBJ_PATH  := \$(PY_OBJ:%=\$(BUILD)/%)
+PY_SRC_PATH  := \$(PY_OBJ:%.o=\$(SRC)/%.cxx)
+PY_SO        := \$(LIB)/${PYLIB}.so
+
+# filter out the general objects
+GEN_OBJ_PATHS := \$(filter-out \$(BUILD)/${PYLIB}.o,\$(GEN_OBJ_PATHS))
 
 # --- all routine
-all: \$(PY_SO)
+ALL_TOP_LEVEL += \$(PY_SO)
 
+EOF
+}
+_add_python_build(){
+    PYLIB=$1
+    cat <<EOF
 # python object compile
-\$(BUILD)/_%.o: _%.cxx
+\$(PY_OBJ_PATH): \$(PY_SRC_PATH)
 	@echo compiling python object \$@
 	@mkdir -p \$(BUILD)
 	@\$(CXX) -c \$(CXXFLAGS) \$(PY_FLAGS) $< -o \$@
 
 # python linking
-\$(PY_SO): \$(GEN_OBJ_PATHS) \$(BUILD)/${BASE_ROUTINE}.o
-	@mkdir -p \$(OUTPUT)
+\$(PY_SO): \$(GEN_OBJ_PATHS) \$(PY_OBJ_PATH)
+	@mkdir -p \$(LIB)
 	@echo "linking $^ --> \$@"
 	@\$(CXX) -o \$@ $^ \$(LIBS) \$(PY_LDFLAGS)
 
