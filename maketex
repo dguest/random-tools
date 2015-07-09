@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 _usage() {
-    echo "${0##*/} [-h] [-m <talk name>]"
+    echo "usage: ${0##*/} [-h] [-m <talk name>]"
 }
 _help() {
     _usage
@@ -10,7 +10,7 @@ Make a talk template in Beamer.
 
 Options:
  -h: get help
- -m: build makefile for <talk name>
+ -m: build makefile for <talk name> (don't output talk)
 
 EOF
 }
@@ -21,16 +21,17 @@ EOF
 _run() {
     local opt
     local MAKE_TARGET=''
-    while getopts "hm:" opt $@; do
+    while getopts ":hm:" opt $@; do
 	case $opt in
 	    h) _help; return 1;;
 	    m) MAKE_TARGET=${OPTARG} ;;
+	    # handle errors
+	    \?) _usage; echo "Unknown option: -$OPTARG" >&2; exit 1;;
+            :) _usage; echo "Missing argument for -$OPTARG" >&2; exit 1;;
+            *) _usage; echo "Unimplemented option: -$OPTARG" >&2; exit 1;;
+
 	esac
     done
-    if [[ ${VARNAME-} == ? ]] ; then
-	echo "error, exiting..." >&2
-	return 1
-    fi
     shift $(($OPTIND - 1))
     if [[ $@ ]] ; then
 	_usage
