@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
+# makefile generator
+#
+# TODO:
+#  - Make this handle ROOT dictionary generation rules
 
 set -eu
 
 _usage() {
-    echo "${0##*/} [-hrdp] "
+    echo "usage: ${0##*/} [-hrdn] [-p <python library>] [-e <exe prefix>]"
 }
 DEFAULT_PREFIX=run-
 _help() {
@@ -18,6 +22,7 @@ Options:
  -h: get help
  -r: use ROOT
  -d: use HDF5
+ -n: use ndhist (requires HDF5)
  -p <lib name>: make python lib
  -e <exe prefix>: prefix for executables
 
@@ -31,26 +36,32 @@ _run() {
     local opt
     local ADD_ROOT=''
     local ADD_HDF=''
+    local ADD_NDHIST=''
     local PYTHON_LIB=''
     local PREFIX=''
-    while getopts "hrdp:e:" opt $@; do
+    while getopts ":hrdnp:e:" opt $@; do
 	case $opt in
 	    h) _help; return 1;;
 	    r) ADD_ROOT=1 ;;
 	    d) ADD_HDF=1 ;;
+	    n) ADD_NDHIST=1 ;;
 	    p) PYTHON_LIB=${OPTARG} ;;
 	    e) PREFIX=${OPTARG} ;;
+	    # handle errors
+	    \?) _usage; echo "Unknown option: -$OPTARG" >&2; exit 1;;
+            :) _usage; echo "Missing argument for -$OPTARG" >&2; exit 1;;
+            *) _usage; echo "Unimplemented option: -$OPTARG" >&2; exit 1;;
 	esac
     done
 
     # various checks
-    if [[ ${VARNAME-} == ? ]] ; then
-	echo "error, exiting..." >&2
-	return 1
-    fi
     if [[ ! $PREFIX && ! $PYTHON_LIB ]] ; then
 	PREFIX=$DEFAULT_PREFIX
 	echo "WARNING: setting default prefix to '$PREFIX'"
+    fi
+    if [[ $ADD_NDHIST && ! $ADD_HDF ]] ; then
+	ADD_HDF=1
+	echo "WARNING: turned on HDF5 because ndhist was enabled"
     fi
     shift $(($OPTIND - 1))
     if [[ $@ ]] ; then
@@ -66,24 +77,38 @@ _run() {
     # actually build the project starting here
     local MAKEFILE=makefile
     _head_comment >| $MAKEFILE
+    _section "Basic Setup" >> $MAKEFILE
     _make_base >> $MAKEFILE
-    if [ $ADD_HDF ] ; then
-	_add_hdf >> $MAKEFILE
+
+    # add libraries to paths
+    if [[ $PYTHON_LIB || $ADD_ROOT || $ADD_HDF || $ADD_NDHIST ]] ; then
+	_section "Add Libraries" >> $MAKEFILE
     fi
-    # _add_ndhist >> $MAKEFILE
     if [ $PYTHON_LIB ] ; then
-       _add_python_config >> $MAKEFILE
+       _add_python >> $MAKEFILE
     fi
     if [ $ADD_ROOT ] ; then
 	_add_root >> $MAKEFILE
     fi
+    if [ $ADD_HDF ] ; then
+	_add_hdf >> $MAKEFILE
+    fi
+    if [ $ADD_NDHIST ] ; then
+	_add_ndhist >> $MAKEFILE
+    fi
+
+    # add objects to be built
+    _section "Add Top Level Objects" >> $MAKEFILE
     if [ $PYTHON_LIB ] ; then
 	_add_python_objects $PYTHON_LIB >> $MAKEFILE
     fi
     if [ $PREFIX ] ; then
 	_add_exe_objects $PREFIX >> $MAKEFILE
     fi
+
+    # first rule is the call to `all`, then add other build rules
     _add_all_call >> $MAKEFILE
+    _section "Add Build Rules" >> $MAKEFILE
     if [ $PYTHON_LIB ] ; then
 	_add_python_build $PYTHON_LIB >> $MAKEFILE
     fi
@@ -92,6 +117,8 @@ _run() {
     fi
     _add_compile_rule >> $MAKEFILE
     _add_dep_gen >> $MAKEFILE
+
+    # write example source files
     _make_obj_dummy tools
     if [ $PYTHON_LIB ] ; then
 	_make_py_dummy $PYTHON_LIB tools
@@ -110,16 +137,25 @@ _files_exist () {
     fi
 }
 
+_section() {
+    cat <<EOF
+# _______________________________________________________________
+# $1
+
+EOF
+}
+
 _head_comment() {
     cat <<EOF
-# makefile
-# auto generated on $(date)
+# makefile for generic c++ project
+# generated with \`${0##*/}\` on $(date)
+# Author: Dan Guest <dguest@cern.ch>
+
 EOF
 }
 
 _make_base() {
     cat <<EOF
-
 # --- set dirs
 BUILD        := build
 SRC          := src
@@ -138,10 +174,14 @@ vpath %Dict.cxx \$(DICT)
 # --- set compiler and flags (roll c options and include paths together)
 CXX          ?= g++
 CXXFLAGS     := -O2 -Wall -fPIC -I\$(INC) -g -std=c++11
+LIBS         := # blank, more will be added below
+LDFLAGS      := # blank, more will be added below
 
-# ---- define objects
+# ---- define objects from files in the SRC directory
 GEN_OBJ_SRC   := \$(wildcard \$(SRC)/*.cxx)
 GEN_OBJ       := \$(notdir \$(GEN_OBJ_SRC:%.cxx=%.o))
+
+# this list may be manipulated in other segments further down
 GEN_OBJ_PATHS := \$(GEN_OBJ:%=\$(BUILD)/%)
 
 # --- all top level (added further down)
@@ -152,9 +192,9 @@ EOF
 
 _add_hdf() {
     cat <<EOF
-# --- hdf
+# --- add HDF5
 HDF_INFO := \$(shell h5c++ -showconfig | grep 'Installation point:')
-HDF_PATH := \$(strip \$(shell echo ${HDF_INFO} | cut -d ':' -f 2 ))
+HDF_PATH := \$(strip \$(shell echo \$(HDF_INFO) | cut -d ':' -f 2 ))
 ifndef HDF_PATH
 \$(error "couldn't find HDF, quitting")
 endif
@@ -174,7 +214,7 @@ CXXFLAGS     += \$(shell ndhist-config --cflags)
 EOF
 }
 
-_add_python_config() {
+_add_python() {
     cat <<EOF
 # --- python config
 PY_CONFIG := python3-config
