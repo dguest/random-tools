@@ -9,22 +9,24 @@ set -eu
 _usage() {
     echo "usage: ${0##*/} [-hrdn] [-p <python library>] [-e <exe prefix>]"
 }
-DEFAULT_PREFIX=run-
+DEFAULT_PREFIX=test-
 _help() {
     _usage
     cat <<EOF
+
 Make a project template. If no prefix is given use "$DEFAULT_PREFIX".
 If no prefix is given but a python library name is given, only make
 a python library.
-WARNING: use in an empty directory
+
+Requires an empty directory.
 
 Options:
  -h: get help
  -r: use ROOT
  -d: use HDF5
  -n: use ndhist (requires HDF5)
- -p <lib name>: make python lib
- -e <exe prefix>: prefix for executables
+ -p <library name>: make python lib
+ -e <executable prefix>: prefix for all executables.
 
 EOF
 }
@@ -63,14 +65,20 @@ _run() {
 	ADD_HDF=1
 	echo "WARNING: turned on HDF5 because ndhist was enabled"
     fi
+    if [[ $PREFIX == $PYTHON_LIB ]] ; then
+	echo "ERROR: python lib and prefix can't be the same..." >&2
+	echo "       maybe add '-' to the end of prefix?" >&2
+	exit 1
+    fi
     shift $(($OPTIND - 1))
     if [[ $@ ]] ; then
 	_usage
-	echo "error: should get no args, got $@..." >&2
+	echo "ERROR: should get no args, got '$@', quitting..." >&2
 	return 1
     fi
     if _files_exist ; then
-	echo "found files in current dir, exiting..." >&2
+	_usage
+	echo "ERROR: found files in current dir, quitting..." >&2
 	return 1
     fi
 
@@ -80,12 +88,18 @@ _run() {
     _section "Basic Setup" >> $MAKEFILE
     _make_base >> $MAKEFILE
 
+    # add objects to be built
+    _section "Add Top Level Objects" >> $MAKEFILE
+    if [ $PYTHON_LIB ] ; then
+	_add_python_objects $PYTHON_LIB >> $MAKEFILE
+    fi
+    if [ $PREFIX ] ; then
+	_add_exe_objects $PREFIX >> $MAKEFILE
+    fi
+
     # add libraries to paths
     if [[ $PYTHON_LIB || $ADD_ROOT || $ADD_HDF || $ADD_NDHIST ]] ; then
 	_section "Add Libraries" >> $MAKEFILE
-    fi
-    if [ $PYTHON_LIB ] ; then
-       _add_python >> $MAKEFILE
     fi
     if [ $ADD_ROOT ] ; then
 	_add_root >> $MAKEFILE
@@ -96,14 +110,8 @@ _run() {
     if [ $ADD_NDHIST ] ; then
 	_add_ndhist >> $MAKEFILE
     fi
-
-    # add objects to be built
-    _section "Add Top Level Objects" >> $MAKEFILE
     if [ $PYTHON_LIB ] ; then
-	_add_python_objects $PYTHON_LIB >> $MAKEFILE
-    fi
-    if [ $PREFIX ] ; then
-	_add_exe_objects $PREFIX >> $MAKEFILE
+       _add_python >> $MAKEFILE
     fi
 
     # first rule is the call to `all`, then add other build rules
@@ -223,6 +231,7 @@ PY_FLAGS  :=   \$(shell \$(PY_CONFIG) --includes)
 PY_LIBS   := -L\$(shell \$(PY_CONFIG) --prefix)/lib
 PY_LIBS   +=   \$(shell \$(PY_CONFIG) --libs)
 
+# define these last because they inherit other LDFLAGS
 PY_LDFLAGS := \$(LDFLAGS)
 PY_LDFLAGS += \$(PY_LIBS)
 PY_LDFLAGS += -shared
@@ -423,7 +432,7 @@ static PyObject* py_alg(PyObject *self, PyObject *args)
     return Py_BuildValue("i", newret);
   }
   catch (const std::exception& e) {
-    PyErr_SetString(PyExc_IOError, e.what());
+    PyErr_SetString(PyExc_Exception, e.what());
     return NULL;
   }
 }
