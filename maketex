@@ -72,7 +72,7 @@ _basic_header() {
     local LONG_INST=${3-"UC Irvine"}
     local INST=${4-"UCI"}
     cat <<EOF
-\documentclass{beamer}
+\documentclass[xcolor={table}]{beamer}
 \useoutertheme{infolines}
 \title{$TITLE}
 \author[${USER}]{$LONG_NAME}
