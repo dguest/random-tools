@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 _usage() {
-    echo "usage: ${0##*/} [-h] [-m <talk name>]"
+    echo "usage: ${0##*/} [-hte] [-m <talk name>]"
 }
 _help() {
     _usage
@@ -11,6 +11,8 @@ Make a talk template in Beamer.
 Options:
  -h: get help
  -m: build makefile for <talk name> (don't output talk)
+ -t: test (build in /tmp)
+ -e: make example slide
 
 EOF
 }
@@ -21,10 +23,14 @@ EOF
 _run() {
     local opt
     local MAKE_TARGET=''
-    while getopts ":hm:" opt $@; do
+    local TEST=''
+    local EXAMPLE_SLIDE=''
+    while getopts ":hm:te" opt $@; do
 	case $opt in
 	    h) _help; return 1;;
 	    m) MAKE_TARGET=${OPTARG} ;;
+	    t) TEST=1 ;;
+	    e) EXAMPLE_SLIDE=1 ;;
 	    # handle errors
 	    \?) _usage; echo "Unknown option: -$OPTARG" >&2; exit 1;;
             :) _usage; echo "Missing argument for -$OPTARG" >&2; exit 1;;
@@ -38,6 +44,10 @@ _run() {
 	echo "error: should get no args, got $@..." >&2
 	return 1
     fi
+    if [[ $TEST ]] ; then
+	_run_test
+	return 0
+    fi
     if [[ $MAKE_TARGET ]] ; then
 	if [[ ! $MAKE_TARGET == *.tex ]] ; then
 	    echo "target should be a .tex file, quitting..." >&2
@@ -46,7 +56,19 @@ _run() {
 	_makefile $MAKE_TARGET
 	return 0
     fi
-    _make_talk
+    _make_talk $EXAMPLE_SLIDE
+}
+
+_run_test() {
+    local TEMPDIR=$(mktemp -d /tmp/latest.XXX)
+    local TEXNAME=test.tex
+    (
+	cd $TEMPDIR
+	maketex -e > $TEXNAME
+	maketex -m $TEXNAME
+	make
+    )
+    echo "made test in $TEMPDIR"
 }
 
 _make_talk() {
@@ -55,10 +77,19 @@ _make_talk() {
     _uci_colors
     echo
     _misc_style
+    _units
     _basic_physics_symbols
     _susy_symbols
     echo
     _larger_macros
+    if [[ $@ ]] ; then
+	_test_slide
+    else
+	_slides
+    fi
+}
+
+_slides () {
     cat <<EOF
 
 % -- set graphics path --
@@ -68,6 +99,30 @@ _make_talk() {
 % main document starts here
 
 \begin{document}
+
+% put slides
+
+\end{document}
+EOF
+}
+
+_test_slide () {
+    cat <<EOF
+
+% -- set graphics path --
+\graphicspath{{figures/}}
+
+% _________________________________________________________________________
+% main document starts here
+
+\begin{document}
+
+\begin{frame}
+  \frametitle{What's Going On}
+  \begin{itemize}
+  \item $\pt\,\mm\,\um\,\cha\,\mm$
+  \end{itemize}
+\end{frame}
 
 % put slides
 
@@ -107,6 +162,17 @@ _misc_style() {
 \setbeamertemplate{navigation symbols}{}
 \setbeamercovered{transparent}
 \usefonttheme{serif} % default family is serif
+EOF
+}
+
+_units() {
+    cat <<EOF
+\newcommand{\um}{\mu \mathrm{m}}
+\newcommand{\mm}{\mathrm{mm}}
+\newcommand{\cm}{\mathrm{cm}}
+\newcommand{\gev}{\mathrm{GeV}}
+\newcommand{\mev}{\mathrm{MeV}}
+\newcommand{\tev}{\mathrm{TeV}}
 EOF
 }
 
@@ -180,6 +246,5 @@ FILTER_WARN := egrep -v \$(IGNORE_WARNINGS) | egrep --color \$(COLOR_WARNINGS)
 	\$(PDFTEX) $<
 EOF
 }
-
 
 _run $@
