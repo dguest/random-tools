@@ -59,11 +59,20 @@ _make_talk() {
     _susy_symbols
     echo
     _larger_macros
-    echo
-    echo "\graphicspath{{figures/}}"
-    echo "\begin{document}"
-    echo
-    echo "\end{document}"
+    cat <<EOF
+
+% -- set graphics path --
+\graphicspath{{figures/}}
+
+% _________________________________________________________________________
+% main document starts here
+
+\begin{document}
+
+% put slides
+
+\end{document}
+EOF
 }
 
 _basic_header() {
