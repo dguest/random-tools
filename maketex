@@ -137,6 +137,7 @@ _basic_header() {
     local INST=${4-"UCI"}
     cat <<EOF
 \documentclass[xcolor={table}]{beamer}
+\usepackage[utf8]{inputenc}
 \useoutertheme{infolines}
 \title{$TITLE}
 \author[${USER}]{$LONG_NAME}
