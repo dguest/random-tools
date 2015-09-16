@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# basic bash script generator
+
+set -eu
+
+_usage() {
+    echo "usage: ${0##*/} [-h]"
+}
+_help() {
+    _usage
+    cat <<EOF
+
+Make a template script (actually this script), since I always forget
+how to set up getopts, etc...
+
+Options:
+ -h: get help
+ -s <script name>: output script name
+
+EOF
+}
+
+# __________________________________________________________________
+# top level run script
+
+_run() {
+    local opt
+    local SCRIPT=''
+    while getopts ":hs:" opt $@; do
+	case $opt in
+	    h) _help; return 1;;
+	    s) SCRIPT=${OPTARG} ;;
+	    # handle errors
+	    \?) _usage; echo "Unknown option: -$OPTARG" >&2; exit 1;;
+            :) _usage; echo "Missing argument for -$OPTARG" >&2; exit 1;;
+            *) _usage; echo "Unimplemented option: -$OPTARG" >&2; exit 1;;
+	esac
+    done
+    shift $(($OPTIND - 1))
+
+    if [[ -z $SCRIPT ]] ; then
+	cat $0
+    else
+	echo printing to $SCRIPT
+	cat $0 > $SCRIPT
+    fi
+
+}
+_run $@
