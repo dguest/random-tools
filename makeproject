@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # makefile generator
 #
+# To use:
+#  - Put this script somewhere in your path
+#  - run it with `-h` to get help
+#
 # TODO:
 #  - Make this handle ROOT dictionary generation rules
 
