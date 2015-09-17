@@ -64,6 +64,18 @@ _run() {
             *) _usage; echo "Unimplemented option: -$OPTARG" >&2; exit 1;;
 	esac
     done
+    # checks for args, files in current directory
+    shift $(($OPTIND - 1))
+    if [[ $@ ]] ; then
+	_usage
+	echo "ERROR: should get no args, got '$@', quitting..." >&2
+	return 1
+    fi
+    if _files_exist ; then
+	_usage
+	echo "ERROR: found files in current dir, quitting..." >&2
+	return 1
+    fi
 
     # various checks
     if [[ ! $PREFIX && ! $PYTHON_LIB ]] ; then
@@ -78,17 +90,6 @@ _run() {
 	echo "ERROR: python lib and prefix can't be the same..." >&2
 	echo "       maybe add '-' to the end of prefix?" >&2
 	exit 1
-    fi
-    shift $(($OPTIND - 1))
-    if [[ $@ ]] ; then
-	_usage
-	echo "ERROR: should get no args, got '$@', quitting..." >&2
-	return 1
-    fi
-    if _files_exist ; then
-	_usage
-	echo "ERROR: found files in current dir, quitting..." >&2
-	return 1
     fi
 
     # actually build the project starting here
