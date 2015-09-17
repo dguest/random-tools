@@ -14,9 +14,18 @@ _help() {
     _usage
     cat <<EOF
 
-Make a project template. If no prefix is given use "$DEFAULT_PREFIX".
-If no prefix is given but a python library name is given, only make
-a python library.
+Make a project template. The directory layout is as follows:
+ - src: .cxx files
+ - include: header files
+ - build: object files (.o)
+
+After running \`make\`, two more directories may be created:
+ - bin: the top level executables
+ - lib: the python library (if defined)
+
+Top level executables source files are identified by their prefix.  If
+no prefix is given use "$DEFAULT_PREFIX".  If no prefix is given but a
+python library name is given, only make a python library.
 
 Requires an empty directory.
 
@@ -193,7 +202,7 @@ GEN_OBJ       := \$(notdir \$(GEN_OBJ_SRC:%.cxx=%.o))
 GEN_OBJ_PATHS := \$(GEN_OBJ:%=\$(BUILD)/%)
 
 # --- all top level (added further down)
-ALL_TOP_LEVEL :=
+ALL_TOP_LEVEL := # blank, more will be added below
 
 EOF
 }
@@ -266,6 +275,7 @@ _add_exe_objects() {
     local PREFIX=$1
     cat <<EOF
 # --- stuff used for the c++ executable
+# everything with this prefix will be built as an executable
 EXE_PREFIX   := ${PREFIX}
 
 ALL_EXE_SRC   := \$(wildcard \$(SRC)/\$(EXE_PREFIX)*.cxx)
