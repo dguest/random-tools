@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# basic bash script generator
+
+set -eu
+
+_usage() {
+    echo "usage: ${0##*/} [options] -o <output> <files>..."
+}
+_help() {
+    _usage
+    cat <<EOF
+
+Combine lots of zipped text files into one text file
+
+Options:
+ -h: get help
+ -o <output file name>: output file name
+ -v: verbose
+
+EOF
+}
+
+# __________________________________________________________________
+# top level run script
+
+_run() {
+    local opt
+    local OUTPUT=''
+    local VERBOSE=''
+    while getopts ":ho:v" opt $@; do
+	case $opt in
+	    h) _help; return 1;;
+	    o) OUTPUT=${OPTARG} ;;
+	    v) VERBOSE=1 ;;
+	    # handle errors
+	    \?) _usage; echo "Unknown option: -$OPTARG" >&2; exit 1;;
+            :) _usage; echo "Missing argument for -$OPTARG" >&2; exit 1;;
+            *) _usage; echo "Unimplemented option: -$OPTARG" >&2; exit 1;;
+	esac
+    done
+    shift $(($OPTIND - 1))
+
+    if [[ -z $OUTPUT ]] ; then
+	echo "require an output file" >&2
+	return 1
+    fi
+
+    local FILE
+    for FILE in $@; do
+	if [[ -n $VERBOSE ]]; then
+	    echo "adding $FILE" >&2
+	fi
+	gunzip -c $FILE
+    done | gzip - > $OUTPUT
+}
+_run $@
