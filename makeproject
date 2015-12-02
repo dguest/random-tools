@@ -5,13 +5,11 @@
 #  - Put this script somewhere in your path
 #  - run it with `-h` to get help
 #
-# TODO:
-#  - Make this handle ROOT dictionary generation rules
 
 set -eu
 
 _usage() {
-    echo "usage: ${0##*/} [-hrdn] [-p <python library>] [-e <exe prefix>]"
+    echo "usage: ${0##*/} [-hrdnv] [-p <python library>] [-e <exe prefix>]"
 }
 DEFAULT_PREFIX=test-
 _help() {
@@ -37,6 +35,7 @@ Options:
  -h: get help
  -r: use ROOT
  -d: use HDF5
+ -v: build STL dictionaries (requires ROOT)
  -n: use ndhist (requires HDF5)
  -p <library name>: make python lib
  -e <executable prefix>: prefix for all executables.
@@ -50,50 +49,56 @@ EOF
 _run() {
     local opt
     local ADD_ROOT=''
+    local ADD_DICT=''
     local ADD_HDF=''
     local ADD_NDHIST=''
     local PYTHON_LIB=''
     local PREFIX=''
-    while getopts ":hrdnp:e:" opt $@; do
-	case $opt in
-	    h) _help; return 1;;
-	    r) ADD_ROOT=1 ;;
-	    d) ADD_HDF=1 ;;
-	    n) ADD_NDHIST=1 ;;
-	    p) PYTHON_LIB=${OPTARG} ;;
-	    e) PREFIX=${OPTARG} ;;
-	    # handle errors
-	    \?) _usage; echo "Unknown option: -$OPTARG" >&2; exit 1;;
+    while getopts ":hrvdnp:e:" opt $@; do
+        case $opt in
+            h) _help; return 1;;
+            r) ADD_ROOT=1 ;;
+            v) ADD_DICT=1 ;;
+            d) ADD_HDF=1 ;;
+            n) ADD_NDHIST=1 ;;
+            p) PYTHON_LIB=${OPTARG} ;;
+            e) PREFIX=${OPTARG} ;;
+            # handle errors
+            \?) _usage; echo "Unknown option: -$OPTARG" >&2; exit 1;;
             :) _usage; echo "Missing argument for -$OPTARG" >&2; exit 1;;
             *) _usage; echo "Unimplemented option: -$OPTARG" >&2; exit 1;;
-	esac
+        esac
     done
     # checks for args, files in current directory
     shift $(($OPTIND - 1))
     if [[ $@ ]] ; then
-	_usage
-	echo "ERROR: should get no args, got '$@', quitting..." >&2
-	return 1
+        _usage
+        echo "ERROR: should get no args, got '$@', quitting..." >&2
+        return 1
     fi
     if _files_exist ; then
-	_usage
-	echo "ERROR: found files in current dir, quitting..." >&2
-	return 1
+        _usage
+        echo "ERROR: found files in current dir, quitting..." >&2
+        return 1
     fi
 
     # various checks
     if [[ ! $PREFIX && ! $PYTHON_LIB ]] ; then
-	PREFIX=$DEFAULT_PREFIX
-	echo "WARNING: setting default prefix to '$PREFIX'"
+        PREFIX=$DEFAULT_PREFIX
+        echo "WARNING: setting default prefix to '$PREFIX'"
     fi
     if [[ $ADD_NDHIST && ! $ADD_HDF ]] ; then
-	ADD_HDF=1
-	echo "WARNING: turned on HDF5 because ndhist was enabled"
+        ADD_HDF=1
+        echo "WARNING: turned on HDF5 because ndhist was enabled"
+    fi
+    if [[ $ADD_DICT && ! $ADD_ROOT ]] ; then
+        ADD_ROOT=1
+        echo "WARNING: turned on ROOT because dict was enabled"
     fi
     if [[ $PREFIX == $PYTHON_LIB ]] ; then
-	echo "ERROR: python lib and prefix can't be the same..." >&2
-	echo "       maybe add '-' to the end of prefix?" >&2
-	exit 1
+        echo "ERROR: python lib and prefix can't be the same..." >&2
+        echo "       maybe add '-' to the end of prefix?" >&2
+        exit 1
     fi
 
     # actually build the project starting here
@@ -105,57 +110,66 @@ _run() {
     # add objects to be built
     _section "Add Top Level Objects" >> $MAKEFILE
     if [ $PYTHON_LIB ] ; then
-	_add_python_objects $PYTHON_LIB >> $MAKEFILE
+        _add_python_objects $PYTHON_LIB >> $MAKEFILE
     fi
     if [ $PREFIX ] ; then
-	_add_exe_objects $PREFIX >> $MAKEFILE
+        _add_exe_objects $PREFIX >> $MAKEFILE
+    fi
+    if [ $ADD_DICT ] ; then
+        _add_dicts >> $MAKEFILE
     fi
 
     # add libraries to paths
     if [[ $PYTHON_LIB || $ADD_ROOT || $ADD_HDF || $ADD_NDHIST ]] ; then
-	_section "Add Libraries" >> $MAKEFILE
+        _section "Add Libraries" >> $MAKEFILE
     fi
     if [ $ADD_ROOT ] ; then
-	_add_root >> $MAKEFILE
+        _add_root >> $MAKEFILE
     fi
     if [ $ADD_HDF ] ; then
-	_add_hdf >> $MAKEFILE
+        _add_hdf >> $MAKEFILE
     fi
     if [ $ADD_NDHIST ] ; then
-	_add_ndhist >> $MAKEFILE
+        _add_ndhist >> $MAKEFILE
     fi
     if [ $PYTHON_LIB ] ; then
-       _add_python >> $MAKEFILE
+        _add_python >> $MAKEFILE
     fi
 
     # first rule is the call to `all`, then add other build rules
     _add_all_call >> $MAKEFILE
     _section "Add Build Rules" >> $MAKEFILE
     if [ $PYTHON_LIB ] ; then
-	_add_python_build $PYTHON_LIB >> $MAKEFILE
+        _add_python_build $PYTHON_LIB >> $MAKEFILE
     fi
     if [ $PREFIX ] ; then
-	_add_exe_build >> $MAKEFILE
+        _add_exe_build >> $MAKEFILE
     fi
     _add_compile_rule >> $MAKEFILE
+    if [ $ADD_DICT ] ; then
+        _add_dict_rules >> $MAKEFILE
+    fi
     _add_dep_gen >> $MAKEFILE
 
     # write example source files
     _make_obj_dummy tools
     if [ $PYTHON_LIB ] ; then
-	_make_py_dummy $PYTHON_LIB tools
+        _make_py_dummy $PYTHON_LIB tools
     fi
     if [ $PREFIX ] ; then
-	_make_src_dummy ${PREFIX}main tools
+        _make_src_dummy ${PREFIX}main tools
+    fi
+    if [ $ADD_DICT ] ; then
+        _make_dict_files
     fi
 }
 
 _files_exist () {
     files=$(shopt -s nullglob dotglob; echo *)
     if (( ${#files} )) ; then
-       return 0
+        return 0
     else
-	return 1
+	      return 1
     fi
 }
 
@@ -272,6 +286,39 @@ _add_all_call() {
     cat <<EOF
 # --- first call here
 all: \$(ALL_TOP_LEVEL)
+
+EOF
+}
+
+_add_dicts() {
+    cat <<EOF
+# _______________________________________________________________
+# Add ROOT dicts
+
+DICT_FILES     := \$(INC)/Stl.h
+TDICTS         := \$(notdir \$(DICT_FILES:.h=Dict.o))
+TDICT_PATHS    := \$(TDICTS:%=\$(BUILD)/%)
+GEN_OBJ_PATHS  += \$(TDICT_PATHS)
+
+EOF
+}
+
+_add_dict_rules() {
+    # root dictionary generation
+    cat <<EOF
+# --- ROOT dictionary generation
+LINKDEF := \$(INC)/LinkDef.h
+\$(DICT)/%Dict.cxx: %.h \$(LINKDEF)
+	@echo making dict \$@
+	@mkdir -p \$(DICT)
+	@rm -f \$(DICT)/\$*Dict.h \$(DICT)/\$*Dict.cxx
+	@rootcint \$@ -c \$(INC)/\$*.h \$(LINKDEF)
+	@sed -i '' 's,#include "\$(INC)/\(.*\)",#include "\1",g' \$(DICT)/\$*Dict.h
+
+\$(BUILD)/%Dict.o: \$(DICT)/%Dict.cxx
+	@mkdir -p \$(BUILD)
+	@echo compiling dict \$@
+	@\$(CXX) \$(CXXFLAGS) \$(ROOTCFLAGS) -c \$< -o \$@ 2> /dev/null
 
 EOF
 }
@@ -474,6 +521,35 @@ extern "C" {
     return PyModule_Create(&${MODNAME});
   }
 }
+EOF
+}
+
+_make_dict_files() {
+    cat <<EOF >| include/LinkDef.h
+#ifdef __CINT__
+
+#pragma link off all globals;
+#pragma link off all classes;
+#pragma link off all functions;
+#pragma link C++ nestedclass;
+#pragma link C++ class std::vector<std::vector<int> >+;
+#pragma link C++ class std::vector<std::vector<float> >+;
+
+#endif // __CINT__
+EOF
+
+    cat <<EOF >| include/Stl.h
+// -*- c++ -*-
+#ifndef __CINT__
+#include <vector>
+#include <string>
+#include <map>
+#endif
+
+class Dummy {
+  vector<vector<int> > vvi;
+  vector<vector<float> > vvf;
+};
 EOF
 }
 
