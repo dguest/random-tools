@@ -139,9 +139,12 @@ _basic_header() {
 \documentclass[xcolor={table}]{beamer}
 \usepackage[utf8]{inputenc}
 \useoutertheme{infolines}
+
+%%%%% Title and Author %%%%%
 \title{$TITLE}
 \author[${USER}]{$LONG_NAME}
 \institute[${INST}]{${LONG_INST}}
+
 EOF
 }
 _uci_colors() {
