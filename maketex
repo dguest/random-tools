@@ -208,6 +208,7 @@ _larger_macros() {
    \addtocounter{framenumber}{\value{framenumberappendix}}
 }
 \newcommand{\link}[2]{\underline{\href{#2}{#1}}}
+\newcommand{\arxiv}[1]{\link{arXiv:#1}{http://arxiv.org/abs/#1}}
 \newcommand{\twocol}[3][0.5]{
   \newdimen\scwid
   \scwid=\dimexpr\textwidth-#1\textwidth\relax
