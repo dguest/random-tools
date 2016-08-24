@@ -27,22 +27,22 @@ _run() {
     local opt
     local SCRIPT=''
     while getopts ":hs:" opt $@; do
-	case $opt in
-	    h) _help; return 1;;
-	    s) SCRIPT=${OPTARG} ;;
-	    # handle errors
-	    \?) _usage; echo "Unknown option: -$OPTARG" >&2; exit 1;;
+        case $opt in
+            h) _help; return 1;;
+            s) SCRIPT=${OPTARG} ;;
+            # handle errors
+            \?) _usage; echo "Unknown option: -$OPTARG" >&2; exit 1;;
             :) _usage; echo "Missing argument for -$OPTARG" >&2; exit 1;;
             *) _usage; echo "Unimplemented option: -$OPTARG" >&2; exit 1;;
-	esac
+        esac
     done
     shift $(($OPTIND - 1))
 
     if [[ -z $SCRIPT ]] ; then
-	cat $0
+        cat $0
     else
-	echo printing to $SCRIPT
-	cat $0 > $SCRIPT
+        echo printing to $SCRIPT
+        cat $0 > $SCRIPT
     fi
 
 }
