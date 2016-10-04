@@ -73,7 +73,7 @@ _run_test() {
 
 _make_talk() {
     # top level functions to dump info
-    _basic_header "Update" "Dan Guest" "UC Irvine" "UCI"
+    _basic_header "Update" "Dan Guest" "UC Irvine" "UCI" "dguest@cern.ch"
     _uci_colors
     echo
     _misc_style
@@ -135,6 +135,7 @@ _basic_header() {
     local LONG_NAME=${2-"Dan Guest"}
     local LONG_INST=${3-"UC Irvine"}
     local INST=${4-"UCI"}
+    local SHORT_NAME=${5-${USER}}
     cat <<EOF
 \documentclass[xcolor={table}]{beamer}
 \usepackage[utf8]{inputenc}
@@ -142,7 +143,7 @@ _basic_header() {
 
 %%%%% Title and Author %%%%%
 \title{$TITLE}
-\author[${USER}]{$LONG_NAME}
+\author[${SHORT_NAME}]{$LONG_NAME}
 \institute[${INST}]{${LONG_INST}}
 
 EOF
