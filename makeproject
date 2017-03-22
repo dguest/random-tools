@@ -429,7 +429,7 @@ DEPTARGSTR = -MT \$(BUILD)/\$*.o -MT \$(DEP)/\$*.d
 CLEANLIST     = *~ *.o *.o~ *.d core
 clean:
 	rm -fr \$(CLEANLIST) \$(CLEANLIST:%=\$(BUILD)/%) \$(CLEANLIST:%=\$(DEP)/%)
-	rm -fr \$(BUILD) \$(DICT) \$(OUTPUT) \$(ROOT_DICT_TMP).*
+	rm -fr \$(BUILD) \$(DICT) \$(OUTPUT) \$(TMPDIR)
 
 rmdep:
 	rm -f \$(DEP)/*.d
