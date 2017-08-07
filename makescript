@@ -1,8 +1,16 @@
 #!/usr/bin/env bash
 # basic bash script generator
 
+# check for interactive session
+if [[ $- == *i* ]]; then
+    echo "don't source me!" >&2
+    return 1
+fi
+
+# set to make sure the script quits if anything goes wrong
 set -eu
 
+# usage and help information
 _usage() {
     echo "usage: ${0##*/} [-h]"
 }
