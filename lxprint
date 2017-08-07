@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# basic bash script generator
+
+# check for interactive session
+if [[ $- == *i* ]]; then
+    echo "don't source me!" >&2
+    return 1
+fi
+
+# set to make sure the script quits if anything goes wrong
+set -eu
+
+# _____________________________________________________________
+# lxprint
+# _LPT_PR='104-RCOR-CAN'
+_LPT_PR='104-RC12-MCANON'
+_lpt_usage() {
+    echo "usage: ${0##*/} [-h] [-p printer] file [file...]"
+}
+_lpt_help() {
+    _lpt_usage
+    cat <<EOF
+
+Print out files from lxplus
+
+Options:
+ -h: get help
+ -p printer: set printer (default: ${_LPT_PR})
+
+EOF
+}
+lxprint() {
+    local opt
+    local PRINTER=${_LPT_PR}
+    while getopts ":hp:" opt $@; do
+        case $opt in
+            h) _lpt_help; return 1;;
+            p) PRINTER=${OPTARG};;
+            # handle errors
+            \?) _lpt_usage; echo "Unknown option: -$OPTARG" >&2; exit 1;;
+            :) _lpt_usage; echo "Missing argument for -$OPTARG" >&2; exit 1;;
+            *) _lpt_usage; echo "Unimplemented option: -$OPTARG" >&2; exit 1;;
+        esac
+    done
+    shift $(($OPTIND - 1))
+    if [[ $# == 0 ]]; then
+        _lpt_usage
+        echo "No file given!" >&2
+        return 1
+    fi
+
+    local FILE=''
+    for FILE in $@; do
+        echo "printing ${FILE} on ${PRINTER}"
+        cat $FILE | ssh lxplus lpr -P ${PRINTER}
+    done
+
+}
+# __________________________________________________________________
+
+
+lxprint $@
