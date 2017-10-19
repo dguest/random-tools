@@ -73,7 +73,7 @@ _run_test() {
 
 _make_talk() {
     # top level functions to dump info
-    _basic_header "Update" "Dan Guest" "UC Irvine" "UCI" "dguest@cern.ch"
+    _basic_header "Update" "Dan~Guest" "UC~Irvine" "UCI" "dguest@cern.ch"
     _uci_colors
     echo
     _misc_style
