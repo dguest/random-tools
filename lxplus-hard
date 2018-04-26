@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+expect <<EOF
+spawn ssh lxplus
+expect {
+  -re "[Pp]assword": {
+    puts "quittin"
+    send \x03
+  }
+  "Last login*" {
+    puts "interactin"
+    interact
+  }
+EOF
+

@@ -139,6 +139,7 @@ _basic_header() {
     cat <<EOF
 \documentclass[xcolor={table}]{beamer}
 \usepackage[utf8]{inputenc}
+\usepackage{minted}
 \useoutertheme{infolines}
 
 %%%%% Title and Author %%%%%
